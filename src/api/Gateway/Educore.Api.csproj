@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.27" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
@@ -14,7 +16,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\building-blocks\Core\Educore.Core.csproj" />
     <ProjectReference Include="..\..\building-blocks\Shared\Educore.Shared.csproj" />
-    <ProjectReference Include="..\..\identity\Api\Educore.Identity.Api.csproj" />
     <ProjectReference Include="..\..\modules\Organization\Educore.Organization.csproj" />
     <ProjectReference Include="..\..\modules\Secretary\Educore.Secretary.csproj" />
     <ProjectReference Include="..\..\modules\Academic\Educore.Academic.csproj" />
