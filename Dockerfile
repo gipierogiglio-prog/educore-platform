@@ -4,7 +4,7 @@ COPY . .
 RUN dotnet restore src/api/Gateway/Educore.Api.csproj
 RUN dotnet publish src/api/Gateway/Educore.Api.csproj -c Release -o /out
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
