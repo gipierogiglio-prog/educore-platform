@@ -1,0 +1,63 @@
+# Dockerfile para homologação — executa testes antes de permitir deploy
+# Usa o mesmo build do Dockerfile principal, mas com target test-runner
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /app
+
+COPY src/building-blocks/Core/Educore.Core.csproj src/building-blocks/Core/
+COPY src/building-blocks/Shared/Educore.Shared.csproj src/building-blocks/Shared/
+COPY src/building-blocks/Database/Educore.Database.csproj src/building-blocks/Database/
+COPY src/modules/Organization/Educore.Organization.csproj src/modules/Organization/
+COPY src/modules/Secretary/Educore.Secretary.csproj src/modules/Secretary/
+COPY src/modules/Academic/Educore.Academic.csproj src/modules/Academic/
+COPY src/modules/Grading/Educore.Grading.csproj src/modules/Grading/
+COPY src/modules/Financial/Educore.Financial.csproj src/modules/Financial/
+COPY src/api/Gateway/Educore.Api.csproj src/api/Gateway/
+COPY tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj tests/Financial.IntegrationTests/
+RUN dotnet restore src/api/Gateway/Educore.Api.csproj && \
+    dotnet restore tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj
+
+COPY . .
+RUN dotnet build --configuration Release --no-restore
+
+# ── Test Runner: builda + testa + dispara deploy na produção ──
+FROM build AS test-runner
+WORKDIR /app
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
+# Se não tiver API key, avisa mas não falha
+RUN if [ -z "$DOKPLOY_API_KEY" ]; then \
+      echo "⚠️  DOKPLOY_API_KEY não definida — deploy automático desabilitado"; \
+    fi
+
+# Roda os testes SQLite
+RUN echo "🏃 Rodando testes SQLite..." && \
+    dotnet test tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj \
+      --configuration Release --no-restore \
+      --filter "FullyQualifiedName!~Postgres" \
+      --logger "console;verbosity=detailed" || \
+    (echo "❌ Testes falharam!" && exit 1)
+
+# Se passou, publica e notifica
+RUN dotnet publish src/api/Gateway/Educore.Api.csproj \
+    --configuration Release --no-build -o /out
+
+# Se tiver API key, dispara deploy na produção
+RUN if [ -n "$DOKPLOY_API_KEY" ]; then \
+      echo "🚀 Disparando deploy em produção..."; \
+      curl -s -X POST "https://dokploy.devgiglio.com/api/application.deploy" \
+        -H "x-api-key: $DOKPLOY_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{"applicationId":"EkPqlYG11SnA8Kw7q0wMH"}'; \
+      echo ""; \
+      echo "✅ Deploy em produção disparado!"; \
+    fi
+
+# Container final pequeno (só o publicado)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Homologation
+COPY --from=test-runner /out .
+ENTRYPOINT ["dotnet", "Educore.Api.dll"]
