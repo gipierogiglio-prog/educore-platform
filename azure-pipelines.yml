@@ -24,14 +24,11 @@ stages:
     displayName: "🔨 Build"
     jobs:
       - job: Build
-        displayName: "Build + Publish"
         steps:
           - checkout: none
           - script: |
-              echo "📥 Clonando repositório..."
               git clone --branch main --depth 1 \
                 https://x-access-token:$(GH_PAT)@github.com/gipierogiglio-prog/educore-platform.git .
-              echo "✅ Clone concluído"
             displayName: "📥 Git Clone"
             env:
               GH_PAT: $(GH_PAT)
@@ -59,8 +56,7 @@ stages:
     dependsOn: Build
     condition: succeeded()
     jobs:
-      - job: SQLiteTests
-        displayName: "34 testes SQLite"
+      - job: Test
         steps:
           - checkout: none
           - script: |
@@ -77,29 +73,22 @@ stages:
               arguments: >
                 --configuration Release
                 --filter "FullyQualifiedName!~Postgres"
-                --logger "console;verbosity=detailed"
 
   - stage: DeployHML
     displayName: "🚀 Deploy HML"
     dependsOn: Test
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - deployment: DeployHML
+      - job: DeployHML
         displayName: "hml-platform.devgiglio.uk"
-        environment: 
-          name: hml
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: none
-                - script: |
-                    curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
-                      -H "x-api-key: $(DOKPLOY_API_KEY)" \
-                      -H "Content-Type: application/json" \
-                      -d '{"applicationId":"$(HML_APP_ID)"}'
-                    echo "✅ HML deploy OK"
-                  displayName: "Deploy HML"
+        steps:
+          - script: |
+              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
+                -H "x-api-key: $(DOKPLOY_API_KEY)" \
+                -H "Content-Type: application/json" \
+                -d '{"applicationId":"$(HML_APP_ID)"}'
+              echo "✅ HML deploy OK"
+            displayName: "Deploy Homologação"
 
   - stage: DeployPROD
     displayName: "🌟 Deploy PROD"
@@ -108,17 +97,15 @@ stages:
     jobs:
       - deployment: DeployPROD
         displayName: "platform.devgiglio.uk"
-        environment: 
-          name: production
+        environment: production
         strategy:
           runOnce:
             deploy:
               steps:
-                - checkout: none
                 - script: |
                     curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
                       -H "x-api-key: $(DOKPLOY_API_KEY)" \
                       -H "Content-Type: application/json" \
                       -d '{"applicationId":"$(PROD_APP_ID)"}'
                     echo "✅ PROD deploy OK"
-                  displayName: "Deploy PROD"
+                  displayName: "Deploy Produção"
