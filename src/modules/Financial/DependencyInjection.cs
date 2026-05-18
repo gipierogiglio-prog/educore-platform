@@ -1,5 +1,6 @@
 using Giglio.EduCore.Financial.Application.Commands.Payments;
 using Giglio.EduCore.Financial.Application.Queries;
+using Giglio.EduCore.Financial.Application.Queries.ExpenseReports;
 using Giglio.EduCore.Financial.Application.Services;
 using Giglio.EduCore.Financial.Domain.Interfaces;
 using Giglio.EduCore.Financial.Infrastructure.Persistence;
@@ -37,6 +38,9 @@ public static class DependencyInjection
         // Query Handlers
         services.AddScoped<GetPaymentsByChargeQueryHandler>();
         services.AddScoped<GetPaymentDetailQueryHandler>();
+        services.AddScoped<GetExpenseReportHandler>();
+        services.AddScoped<GetExpenseReportQueryValidator>();
+        services.AddScoped<GetInadimplenciaByClassQueryHandler>();
 
         // Background Jobs
         services.AddHostedService<MonthlyChargeGenerationJob>();
