@@ -1,0 +1,63 @@
+# Docker Compose para executar os testes de integração do Módulo Financeiro
+# Uso: docker compose -f tests/docker-compose.yml up --abort-on-container-exit
+#       docker compose -f tests/docker-compose.yml down
+
+services:
+  # PostgreSQL para os testes de fidelidade
+  postgres:
+    image: postgres:16-alpine
+    container_name: educore-test-pg
+    environment:
+      POSTGRES_DB: educore_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test123
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d educore_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-net
+
+  # Test runner (SQLite — rápidos, sem dependência)
+  tests-sqlite:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile
+      target: test
+    container_name: educore-tests-sqlite
+    command: >
+      dotnet test tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj
+        --configuration Release
+        --no-restore
+        --filter "FullyQualifiedName!~Postgres"
+        --logger "console;verbosity=detailed"
+    networks:
+      - test-net
+
+  # Test runner (PostgreSQL — fidelidade, requer o postgres)
+  tests-postgres:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile
+      target: test
+    container_name: educore-tests-postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+    command: >
+      dotnet test tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj
+        --configuration Release
+        --no-restore
+        --filter "Database=PostgreSQL"
+        --logger "console;verbosity=detailed"
+    networks:
+      - test-net
+
+networks:
+  test-net:
+    driver: bridge
