@@ -79,31 +79,46 @@ stages:
                 --filter "FullyQualifiedName!~Postgres"
                 --logger "console;verbosity=detailed"
 
-  - stage: Deploy
-    displayName: "🚀 Deploy"
+  - stage: DeployHML
+    displayName: "🚀 Deploy HML"
     dependsOn: Test
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - job: DeployHML
-        displayName: "HML: hml-platform.devgiglio.uk"
-        steps:
-          - checkout: none
-          - script: |
-              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
-                -H "x-api-key: $(DOKPLOY_API_KEY)" \
-                -H "Content-Type: application/json" \
-                -d '{"applicationId":"$(HML_APP_ID)"}'
-              echo "✅ HML deploy OK"
-            displayName: "Deploy HML"
-      - job: DeployProd
-        displayName: "PROD: platform.devgiglio.uk"
-        dependsOn: DeployHML
-        steps:
-          - checkout: none
-          - script: |
-              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
-                -H "x-api-key: $(DOKPLOY_API_KEY)" \
-                -H "Content-Type: application/json" \
-                -d '{"applicationId":"$(PROD_APP_ID)"}'
-              echo "✅ PROD deploy OK"
-            displayName: "Deploy PROD"
+      - deployment: DeployHML
+        displayName: "hml-platform.devgiglio.uk"
+        environment: 
+          name: hml
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+                - script: |
+                    curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
+                      -H "x-api-key: $(DOKPLOY_API_KEY)" \
+                      -H "Content-Type: application/json" \
+                      -d '{"applicationId":"$(HML_APP_ID)"}'
+                    echo "✅ HML deploy OK"
+                  displayName: "Deploy HML"
+
+  - stage: DeployPROD
+    displayName: "🌟 Deploy PROD"
+    dependsOn: DeployHML
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployPROD
+        displayName: "platform.devgiglio.uk"
+        environment: 
+          name: production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+                - script: |
+                    curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
+                      -H "x-api-key: $(DOKPLOY_API_KEY)" \
+                      -H "Content-Type: application/json" \
+                      -d '{"applicationId":"$(PROD_APP_ID)"}'
+                    echo "✅ PROD deploy OK"
+                  displayName: "Deploy PROD"
