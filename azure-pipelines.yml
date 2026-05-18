@@ -6,14 +6,6 @@ trigger:
     include:
       - main
 
-resources:
-  repositories:
-    - repository: self
-      type: github
-      name: gipierogiglio-prog/educore-platform
-      ref: main
-      endpoint: gianpiero201
-
 variables:
   - group: educore-platform-vars
   - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
@@ -28,10 +20,6 @@ variables:
 pool:
   vmImage: ubuntu-latest
 
-steps:
-  - checkout: self
-    persistCredentials: true
-
 stages:
   - stage: Build
     displayName: "🔨 Build"
@@ -39,6 +27,8 @@ stages:
       - job: Build
         displayName: "Build + Publish"
         steps:
+          - checkout: self
+            persistCredentials: true
           - task: DotNetCoreCLI@2
             displayName: "📦 Restore"
             inputs:
@@ -75,6 +65,8 @@ stages:
       - job: SQLiteTests
         displayName: "34 testes de integração"
         steps:
+          - checkout: self
+            persistCredentials: true
           - task: DotNetCoreCLI@2
             displayName: "🏃 Rodando testes"
             inputs:
@@ -102,6 +94,8 @@ stages:
             ports:
               - 5432:5432
         steps:
+          - checkout: self
+            persistCredentials: true
           - task: DotNetCoreCLI@2
             displayName: "🏃 Rodando testes PG"
             inputs:
@@ -120,6 +114,7 @@ stages:
       - job: DeployHML
         displayName: "hml-platform.devgiglio.uk"
         steps:
+          - checkout: none
           - script: |
               echo "🚀 Deploy HML: $(HML_APP_ID)"
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
@@ -137,6 +132,7 @@ stages:
       - job: DeployProd
         displayName: "platform.devgiglio.uk"
         steps:
+          - checkout: none
           - script: |
               echo "🌟 Deploy PROD: $(PROD_APP_ID)"
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
@@ -154,6 +150,7 @@ stages:
       - job: CloseTasks
         displayName: "Fechar tasks no Board"
         steps:
+          - checkout: none
           - script: |
               echo "📋 Fechando tasks do módulo financeiro..."
               for task_id in 150 151 153 154 156 157 160 161 164 165 167 168; do
