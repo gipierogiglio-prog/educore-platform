@@ -1,3 +1,5 @@
+using Giglio.EduCore.Financial.Application.Commands.Payments;
+using Giglio.EduCore.Financial.Application.Queries;
 using Giglio.EduCore.Financial.Application.Services;
 using Giglio.EduCore.Financial.Domain.Interfaces;
 using Giglio.EduCore.Financial.Infrastructure.Persistence;
@@ -23,9 +25,18 @@ public static class DependencyInjection
         services.AddScoped<IExpenseCategoryRepository, ExpenseCategoryRepository>();
         services.AddScoped<IExpenseRepository, ExpenseRepository>();
         services.AddScoped<IMonthlyChargeRepository, MonthlyChargeRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
 
         // Domain Services
         services.AddScoped<IChargeGenerationService, ChargeGenerationService>();
+
+        // Command Handlers
+        services.AddScoped<RegisterPaymentCommandHandler>();
+        services.AddScoped<CancelPaymentCommandHandler>();
+
+        // Query Handlers
+        services.AddScoped<GetPaymentsByChargeQueryHandler>();
+        services.AddScoped<GetPaymentDetailQueryHandler>();
 
         // Background Jobs
         services.AddHostedService<MonthlyChargeGenerationJob>();
