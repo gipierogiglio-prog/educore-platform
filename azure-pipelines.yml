@@ -1,11 +1,11 @@
 # Azure Pipelines — EduCore Platform
-# Build → Test → Deploy automático
+# Pipeline ÚNICA: Build → Test → Deploy (HML + PROD)
+# Dokploy fica apenas como hosting (Traefik + containers)
 
 trigger:
   branches:
     include:
       - main
-      - develop
 
 pool:
   vmImage: ubuntu-latest
@@ -24,7 +24,7 @@ stages:
     displayName: "🔨 Build"
     jobs:
       - job: Build
-        displayName: "Build .NET"
+        displayName: "Build + Publish"
         steps:
           - task: DotNetCoreCLI@2
             displayName: "📦 Restore"
@@ -55,7 +55,7 @@ stages:
               artifactName: "educore-platform"
 
   # ═══════════════════════════════════════════
-  # Stage 2: Testes SQLite (rápidos)
+  # Stage 2: Testes SQLite (34 testes, ~2s)
   # ═══════════════════════════════════════════
   - stage: TestSQLite
     displayName: "🧪 Testes SQLite"
@@ -66,7 +66,7 @@ stages:
         displayName: "34 testes de integração"
         steps:
           - task: DotNetCoreCLI@2
-            displayName: "🏃 Rodando testes SQLite"
+            displayName: "🏃 Rodando testes"
             inputs:
               command: test
               projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
@@ -75,10 +75,9 @@ stages:
                 --no-restore
                 --filter "FullyQualifiedName!~Postgres"
                 --logger "console;verbosity=detailed"
-            continueOnError: false
 
   # ═══════════════════════════════════════════
-  # Stage 3: Testes PostgreSQL (fidelidade)
+  # Stage 3: Testes PostgreSQL (8 testes)
   # ═══════════════════════════════════════════
   - stage: TestPostgreSQL
     displayName: "🐘 Testes PostgreSQL"
@@ -98,7 +97,7 @@ stages:
               - 5432:5432
         steps:
           - task: DotNetCoreCLI@2
-            displayName: "🏃 Rodando testes PostgreSQL"
+            displayName: "🏃 Rodando testes PG"
             inputs:
               command: test
               projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
@@ -107,71 +106,66 @@ stages:
                 --no-restore
                 --filter "Database=PostgreSQL"
                 --logger "console;verbosity=detailed"
-              env:
-                POSTGRES_CONNECTION: "Host=localhost;Port=5432;Database=educore_test;Username=test;Password=test123"
 
   # ═══════════════════════════════════════════
   # Stage 4: Deploy Homologação
   # ═══════════════════════════════════════════
   - stage: DeployHML
-    displayName: "🚀 Deploy Homologação"
+    displayName: "🚀 Deploy HML"
     dependsOn: TestPostgreSQL
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - job: DeployToHML
-        displayName: "Deploy hml-platform.devgiglio.uk"
+      - job: DeployHML
+        displayName: "hml-platform.devgiglio.uk"
         steps:
           - script: |
-              echo "🚀 Disparando deploy em homologação..."
+              echo "🚀 Deploy HML: $(HML_APP_ID)"
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
                 -H "x-api-key: $(DOKPLOY_API_KEY)" \
                 -H "Content-Type: application/json" \
-                -d '{"applicationId":"$(HML_APP_ID)"}'
-              echo ""
-              echo "✅ Deploy homologação disparado!"
-            displayName: "Trigger Deploy Homologação"
+                -d '{"applicationId":"$(HML_APP_ID)"}' && \
+              echo "" && echo "✅ HML deploy disparado!"
+            displayName: "Trigger Deploy"
 
   # ═══════════════════════════════════════════
   # Stage 5: Deploy Produção
   # ═══════════════════════════════════════════
   - stage: DeployProd
-    displayName: "🌟 Deploy Produção"
+    displayName: "🌟 Deploy PROD"
     dependsOn: DeployHML
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - job: DeployToProd
-        displayName: "Deploy platform.devgiglio.uk"
+      - job: DeployProd
+        displayName: "platform.devgiglio.uk"
         steps:
           - script: |
-              echo "🌟 Disparando deploy em produção..."
+              echo "🌟 Deploy PROD: $(PROD_APP_ID)"
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
                 -H "x-api-key: $(DOKPLOY_API_KEY)" \
                 -H "Content-Type: application/json" \
-                -d '{"applicationId":"$(PROD_APP_ID)"}'
-              echo ""
-              echo "✅ Deploy produção disparado!"
-            displayName: "Trigger Deploy Produção"
+                -d '{"applicationId":"$(PROD_APP_ID)"}' && \
+              echo "" && echo "✅ PROD deploy disparado!"
+            displayName: "Trigger Deploy"
 
   # ═══════════════════════════════════════════
-  # Stage 6: Atualizar Work Items
+  # Stage 6: Atualizar Azure DevOps Tasks
   # ═══════════════════════════════════════════
   - stage: UpdateTasks
-    displayName: "📋 Atualizar Azure DevOps Tasks"
+    displayName: "📋 Atualizar Tasks"
     dependsOn: DeployProd
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: CloseTasks
-        displayName: "Fechar tasks implementadas"
+        displayName: "Fechar tasks no Board"
         steps:
           - script: |
-              echo "📋 Atualizando work items..."
-              # Fechar tasks do módulo financeiro que foram implementadas
+              echo "📋 Fechando tasks do módulo financeiro..."
               for task_id in 150 151 153 154 156 157 160 161 164 165 167 168; do
-                curl -s -u ":$(AZURE_PAT)" \
+                RESP=$(curl -s -u ":$(AZURE_PAT)" \
                   -H "Content-Type: application/json-patch+json" \
                   -X PATCH "https://dev.azure.com/$(AZURE_ORG)/$(AZURE_PROJECT)/_apis/wit/workitems/$task_id?api-version=7.1" \
-                  -d '[{"op":"add","path":"/fields/System.State","value":"Resolved"}]'
-                echo "  ✅ Task $task_id -> Resolved"
+                  -d '[{"op":"add","path":"/fields/System.State","value":"Resolved"}]')
+                echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  ✅ #{d[\"id\"]} -> {d[\"fields\"][\"System.State\"]}')"
               done
             displayName: "Tasks -> Resolved"
             env:
