@@ -1,11 +1,18 @@
 # Azure Pipelines — EduCore Platform
 # Pipeline única: Build → Test → Deploy (HML + PROD)
-# Dokploy fica apenas como hosting (Traefik + containers)
 
 trigger:
   branches:
     include:
       - main
+
+resources:
+  repositories:
+    - repository: self
+      type: github
+      name: gipierogiglio-prog/educore-platform
+      ref: main
+      endpoint: gianpiero201
 
 variables:
   - group: educore-platform-vars
@@ -21,10 +28,11 @@ variables:
 pool:
   vmImage: ubuntu-latest
 
+steps:
+  - checkout: self
+    persistCredentials: true
+
 stages:
-  # ═══════════════════════════════════════════
-  # Stage 1: Build
-  # ═══════════════════════════════════════════
   - stage: Build
     displayName: "🔨 Build"
     jobs:
@@ -59,9 +67,6 @@ stages:
               pathToPublish: "$(Build.ArtifactStagingDirectory)"
               artifactName: "educore-platform"
 
-  # ═══════════════════════════════════════════
-  # Stage 2: Testes SQLite (34 testes, ~2s)
-  # ═══════════════════════════════════════════
   - stage: TestSQLite
     displayName: "🧪 Testes SQLite"
     dependsOn: Build
@@ -76,14 +81,10 @@ stages:
               command: test
               projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
               arguments: >
-                --configuration Release
-                --no-restore
+                --configuration Release --no-restore
                 --filter "FullyQualifiedName!~Postgres"
                 --logger "console;verbosity=detailed"
 
-  # ═══════════════════════════════════════════
-  # Stage 3: Testes PostgreSQL (8 testes)
-  # ═══════════════════════════════════════════
   - stage: TestPostgreSQL
     displayName: "🐘 Testes PostgreSQL"
     dependsOn: TestSQLite
@@ -107,16 +108,12 @@ stages:
               command: test
               projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
               arguments: >
-                --configuration Release
-                --no-restore
+                --configuration Release --no-restore
                 --filter "Database=PostgreSQL"
                 --logger "console;verbosity=detailed"
 
-  # ═══════════════════════════════════════════
-  # Stage 4: Deploy Homologação
-  # ═══════════════════════════════════════════
   - stage: DeployHML
-    displayName: "🚀 Deploy Homologação"
+    displayName: "🚀 Deploy HML"
     dependsOn: TestPostgreSQL
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
@@ -132,11 +129,8 @@ stages:
               echo "" && echo "✅ HML deploy disparado!"
             displayName: "Trigger Deploy"
 
-  # ═══════════════════════════════════════════
-  # Stage 5: Deploy Produção
-  # ═══════════════════════════════════════════
   - stage: DeployProd
-    displayName: "🌟 Deploy Produção"
+    displayName: "🌟 Deploy PROD"
     dependsOn: DeployHML
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
@@ -152,9 +146,6 @@ stages:
               echo "" && echo "✅ PROD deploy disparado!"
             displayName: "Trigger Deploy"
 
-  # ═══════════════════════════════════════════
-  # Stage 6: Atualizar Azure DevOps Tasks
-  # ═══════════════════════════════════════════
   - stage: UpdateTasks
     displayName: "📋 Atualizar Tasks"
     dependsOn: DeployProd
