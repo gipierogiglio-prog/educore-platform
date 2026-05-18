@@ -78,10 +78,19 @@ stages:
                 docker pull $(IMAGE_NAME):latest
                 docker stop educore-hml 2>/dev/null || true
                 docker rm educore-hml 2>/dev/null || true
-                docker run -d --name educore-hml --restart unless-stopped -p 8081:8080 $(IMAGE_NAME):latest
-                echo '✅ HML container rodando'
+                docker run -d --name educore-hml --restart unless-stopped \
+                  -l traefik.enable=true \
+                  -l traefik.http.routers.educore-hml.rule=Host(\\`hml-platform.devgiglio.uk\\`) \
+                  -l traefik.http.routers.educore-hml.entrypoints=websecure \
+                  -l traefik.http.services.educore-hml.loadbalancer.server.port=8080 \
+                  -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt \
+                  -l edu-core-platform.network=traefik \
+                  $(IMAGE_NAME):latest
+                echo '✅ HML OK'
               "
             displayName: "SSH Deploy HML"
+            env:
+              SSHPASS: $(SSH_PASSWORD)
 
   - stage: DeployPROD
     displayName: "🌟 Deploy PROD"
@@ -101,7 +110,14 @@ stages:
                       docker pull $(IMAGE_NAME):latest
                       docker stop educore-platform 2>/dev/null || true
                       docker rm educore-platform 2>/dev/null || true
-                      docker run -d --name educore-platform --restart unless-stopped -p 8080:8080 $(IMAGE_NAME):latest
-                      echo '✅ PROD container rodando'
+                      docker run -d --name educore-platform --restart unless-stopped \
+                        -l traefik.enable=true \
+                        -l traefik.http.routers.educore-platform.rule=Host(\\`platform.devgiglio.uk\\`) \
+                        -l traefik.http.routers.educore-platform.entrypoints=websecure \
+                        -l traefik.http.services.educore-platform.loadbalancer.server.port=8080 \
+                        -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt \
+                        -l edu-core-platform.network=traefik \
+                        $(IMAGE_NAME):latest
+                      echo '✅ PROD OK'
                     "
                   displayName: "SSH Deploy PROD"
