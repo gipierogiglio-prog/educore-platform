@@ -21,7 +21,15 @@ public class AcademicController : ControllerBase
     {
         var oid = OrgId; if (oid == null) return BadRequest(new { message = "Sem organização" });
         return Ok(await _db.Classes.Where(c => c.OrganizationId == oid)
-            .Select(c => new { c.Id, c.Name, c.Shift, c.Year, c.Room, c.Active })
+            .Select(c => new {
+                c.Id,
+                c.Name,
+                c.Shift,
+                c.Year,
+                c.Room,
+                c.Active,
+                studentCount = _db.Enrollments.Count(e => e.ClassId == c.Id)
+            })
             .OrderBy(c => c.Name).ToListAsync());
     }
 
