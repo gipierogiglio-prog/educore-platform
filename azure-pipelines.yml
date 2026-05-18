@@ -76,24 +76,9 @@ stages:
               echo "🔧 Instalando sshpass..."
               sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
               echo "🚀 Deploy HML via SSH..."
-              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
-              echo "🔧 Instalando sshpass..."; sudo apt-get update -qq && sudo apt-get install -y -qq sshpass 2>&1 | tail -1; \
-                docker pull $(IMAGE_NAME):latest
-                docker stop educore-hml 2>/dev/null || true
-                docker rm educore-hml 2>/dev/null || true
-                docker run -d --name educore-hml --restart unless-stopped \
-                  -l traefik.enable=true \
-                  -l traefik.http.routers.educore-hml.rule=Host(\\`hml-platform.devgiglio.uk\\`) \
-                  -l traefik.http.routers.educore-hml.entrypoints=websecure \
-                  -l traefik.http.services.educore-hml.loadbalancer.server.port=8080 \
-                  -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt \
-                  -l edu-core-platform.network=traefik \
-                  $(IMAGE_NAME):latest
-                echo '✅ HML OK'
-              "
+              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "docker pull $(IMAGE_NAME):latest && docker stop educore-hml 2>/dev/null || true && docker rm educore-hml 2>/dev/null || true && docker run -d --name educore-hml --restart unless-stopped --network dokploy-network -l traefik.enable=true -l traefik.http.routers.educore-hml.rule=Host(\`hml-platform.devgiglio.uk\`) -l traefik.http.routers.educore-hml.entrypoints=websecure -l traefik.http.services.educore-hml.loadbalancer.server.port=8080 -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt $(IMAGE_NAME):latest"
+              echo "✅ HML OK"
             displayName: "SSH Deploy HML"
-            env:
-              SSHPASS: $(SSH_PASSWORD)
 
   - stage: DeployPROD
     displayName: "🌟 Deploy PROD"
@@ -108,22 +93,7 @@ stages:
             deploy:
               steps:
                 - script: |
-                    echo "🔧 Instalando sshpass..."
-                    sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
                     echo "🌟 Deploy PROD via SSH..."
-                    sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
-              echo "🔧 Instalando sshpass..."; sudo apt-get update -qq && sudo apt-get install -y -qq sshpass 2>&1 | tail -1; \
-                      docker pull $(IMAGE_NAME):latest
-                      docker stop educore-platform 2>/dev/null || true
-                      docker rm educore-platform 2>/dev/null || true
-                      docker run -d --name educore-platform --restart unless-stopped \
-                        -l traefik.enable=true \
-                        -l traefik.http.routers.educore-platform.rule=Host(\\`platform.devgiglio.uk\\`) \
-                        -l traefik.http.routers.educore-platform.entrypoints=websecure \
-                        -l traefik.http.services.educore-platform.loadbalancer.server.port=8080 \
-                        -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt \
-                        -l edu-core-platform.network=traefik \
-                        $(IMAGE_NAME):latest
-                      echo '✅ PROD OK'
-                    "
+                    sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "docker pull $(IMAGE_NAME):latest && docker stop educore-platform 2>/dev/null || true && docker rm educore-platform 2>/dev/null || true && docker run -d --name educore-platform --restart unless-stopped --network dokploy-network -l traefik.enable=true -l traefik.http.routers.educore-platform.rule=Host(\`platform.devgiglio.uk\`) -l traefik.http.routers.educore-platform.entrypoints=websecure -l traefik.http.services.educore-platform.loadbalancer.server.port=8080 -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt $(IMAGE_NAME):latest"
+                    echo "✅ PROD OK"
                   displayName: "SSH Deploy PROD"
