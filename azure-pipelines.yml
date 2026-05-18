@@ -73,8 +73,11 @@ stages:
         displayName: "hml-platform.devgiglio.uk"
         steps:
           - script: |
+              echo "🔧 Instalando sshpass..."
+              sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
               echo "🚀 Deploy HML via SSH..."
               sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+              echo "🔧 Instalando sshpass..."; sudo apt-get update -qq && sudo apt-get install -y -qq sshpass 2>&1 | tail -1; \
                 docker pull $(IMAGE_NAME):latest
                 docker stop educore-hml 2>/dev/null || true
                 docker rm educore-hml 2>/dev/null || true
@@ -105,8 +108,11 @@ stages:
             deploy:
               steps:
                 - script: |
+                    echo "🔧 Instalando sshpass..."
+                    sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
                     echo "🌟 Deploy PROD via SSH..."
                     sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+              echo "🔧 Instalando sshpass..."; sudo apt-get update -qq && sudo apt-get install -y -qq sshpass 2>&1 | tail -1; \
                       docker pull $(IMAGE_NAME):latest
                       docker stop educore-platform 2>/dev/null || true
                       docker rm educore-platform 2>/dev/null || true
