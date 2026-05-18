@@ -1,27 +1,25 @@
 # Azure Pipelines — EduCore Platform
-# Pipeline ÚNICA: Build → Test → Deploy (HML + PROD)
+# Pipeline única: Build → Test → Deploy (HML + PROD)
 # Dokploy fica apenas como hosting (Traefik + containers)
-
-variables:
-  - group: educore-platform-vars
-    value: 1
-    value: "https://dokploy.devgiglio.com"
-    value: "EkPqlYG11SnA8Kw7q0wMH"
-    value: "9hMNEOpTN5eh-SZ2oTXJR"
 
 trigger:
   branches:
     include:
       - main
 
+variables:
+  - group: educore-platform-vars
+  - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
+    value: 1
+  - name: DOKPLOY_URL
+    value: "https://dokploy.devgiglio.com"
+  - name: PROD_APP_ID
+    value: "EkPqlYG11SnA8Kw7q0wMH"
+  - name: HML_APP_ID
+    value: "9hMNEOpTN5eh-SZ2oTXJR"
+
 pool:
   vmImage: ubuntu-latest
-
-variables:
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-  DOKPLOY_URL: "https://dokploy.devgiglio.com"
-  PROD_APP_ID: "EkPqlYG11SnA8Kw7q0wMH"
-  HML_APP_ID: "9hMNEOpTN5eh-SZ2oTXJR"
 
 stages:
   # ═══════════════════════════════════════════
@@ -118,7 +116,7 @@ stages:
   # Stage 4: Deploy Homologação
   # ═══════════════════════════════════════════
   - stage: DeployHML
-    displayName: "🚀 Deploy HML"
+    displayName: "🚀 Deploy Homologação"
     dependsOn: TestPostgreSQL
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
@@ -138,7 +136,7 @@ stages:
   # Stage 5: Deploy Produção
   # ═══════════════════════════════════════════
   - stage: DeployProd
-    displayName: "🌟 Deploy PROD"
+    displayName: "🌟 Deploy Produção"
     dependsOn: DeployHML
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
@@ -168,12 +166,14 @@ stages:
           - script: |
               echo "📋 Fechando tasks do módulo financeiro..."
               for task_id in 150 151 153 154 156 157 160 161 164 165 167 168; do
-                RESP=$(curl -s -u ":$(AZURE_PAT)" \
+                RESP=$(curl -s -u ":$AZURE_PAT_RAW" \
                   -H "Content-Type: application/json-patch+json" \
-                  -X PATCH "https://dev.azure.com/$(AZURE_ORG)/$(AZURE_PROJECT)/_apis/wit/workitems/$task_id?api-version=7.1" \
+                  -X PATCH "https://dev.azure.com/${AZURE_ORG}/${AZURE_PROJECT}/_apis/wit/workitems/$task_id?api-version=7.1" \
                   -d '[{"op":"add","path":"/fields/System.State","value":"Resolved"}]')
                 echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  ✅ #{d[\"id\"]} -> {d[\"fields\"][\"System.State\"]}')"
               done
             displayName: "Tasks -> Resolved"
             env:
-              AZURE_PAT: $(AZURE_PAT)
+              AZURE_PAT_RAW: $(AZURE_PAT)
+              AZURE_ORG: $(AZURE_ORG)
+              AZURE_PROJECT: $(AZURE_PROJECT)
