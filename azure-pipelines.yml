@@ -2,6 +2,13 @@
 # Pipeline ÚNICA: Build → Test → Deploy (HML + PROD)
 # Dokploy fica apenas como hosting (Traefik + containers)
 
+variables:
+  - group: educore-platform-vars
+    value: 1
+    value: "https://dokploy.devgiglio.com"
+    value: "EkPqlYG11SnA8Kw7q0wMH"
+    value: "9hMNEOpTN5eh-SZ2oTXJR"
+
 trigger:
   branches:
     include:
