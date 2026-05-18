@@ -1,0 +1,91 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: educore_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test123
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: 📦 Restore
+        run: dotnet restore
+
+      - name: 🔨 Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: 🧪 Run SQLite Tests (fast)
+        run: |
+          echo "╔══════════════════════════════════╗"
+          echo "║   🏃 SQLite Integration Tests    ║"
+          echo "╚══════════════════════════════════╝"
+          dotnet test tests/Financial.IntegrationTests \
+            --configuration Release \
+            --no-build \
+            --filter "FullyQualifiedName!~Postgres" \
+            --logger "console;verbosity=detailed"
+
+      - name: 🐘 Run PostgreSQL Tests (fidelity)
+        if: success()
+        env:
+          POSTGRES_CONNECTION: "Host=localhost;Port=5432;Database=educore_test;Username=test;Password=test123"
+        run: |
+          echo "╔══════════════════════════════════╗"
+          echo "║   🐘 PostgreSQL Fidelity Tests   ║"
+          echo "╚══════════════════════════════════╝"
+          dotnet test tests/Financial.IntegrationTests \
+            --configuration Release \
+            --no-build \
+            --filter "Database=PostgreSQL" \
+            --logger "console;verbosity=detailed"
+
+      - name: 📊 Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/**"
+          retention-days: 7
+
+  deploy-hml:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 🚀 Trigger Deploy on Dokploy (Homologação)
+        run: |
+          echo "Triggering deploy to homologation environment..."
+          curl -s -X POST "https://dokploy.devgiglio.com/api/application.deploy" \
+            -H "x-api-key: ${{ secrets.DOKPLOY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"applicationId":"9hMNEOpTN5eh-SZ2oTXJR"}'
+          echo "✅ Deploy triggered!"
