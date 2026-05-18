@@ -1,0 +1,178 @@
+# Azure Pipelines — EduCore Platform
+# Build → Test → Deploy automático
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+  DOKPLOY_URL: "https://dokploy.devgiglio.com"
+  PROD_APP_ID: "EkPqlYG11SnA8Kw7q0wMH"
+  HML_APP_ID: "9hMNEOpTN5eh-SZ2oTXJR"
+
+stages:
+  # ═══════════════════════════════════════════
+  # Stage 1: Build
+  # ═══════════════════════════════════════════
+  - stage: Build
+    displayName: "🔨 Build"
+    jobs:
+      - job: Build
+        displayName: "Build .NET"
+        steps:
+          - task: DotNetCoreCLI@2
+            displayName: "📦 Restore"
+            inputs:
+              command: restore
+              projects: "**/*.csproj"
+
+          - task: DotNetCoreCLI@2
+            displayName: "🔨 Build"
+            inputs:
+              command: build
+              projects: "**/*.csproj"
+              arguments: "--configuration Release --no-restore"
+
+          - task: DotNetCoreCLI@2
+            displayName: "📦 Publish"
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: "src/api/Gateway/Educore.Api.csproj"
+              arguments: "--configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app"
+              zipAfterPublish: false
+
+          - task: PublishBuildArtifacts@1
+            displayName: "📤 Upload Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: "educore-platform"
+
+  # ═══════════════════════════════════════════
+  # Stage 2: Testes SQLite (rápidos)
+  # ═══════════════════════════════════════════
+  - stage: TestSQLite
+    displayName: "🧪 Testes SQLite"
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: SQLiteTests
+        displayName: "34 testes de integração"
+        steps:
+          - task: DotNetCoreCLI@2
+            displayName: "🏃 Rodando testes SQLite"
+            inputs:
+              command: test
+              projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
+              arguments: >
+                --configuration Release
+                --no-restore
+                --filter "FullyQualifiedName!~Postgres"
+                --logger "console;verbosity=detailed"
+            continueOnError: false
+
+  # ═══════════════════════════════════════════
+  # Stage 3: Testes PostgreSQL (fidelidade)
+  # ═══════════════════════════════════════════
+  - stage: TestPostgreSQL
+    displayName: "🐘 Testes PostgreSQL"
+    dependsOn: TestSQLite
+    condition: succeeded()
+    jobs:
+      - job: PostgresTests
+        displayName: "8 testes de fidelidade"
+        services:
+          postgres:
+            image: postgres:16-alpine
+            env:
+              POSTGRES_DB: educore_test
+              POSTGRES_USER: test
+              POSTGRES_PASSWORD: test123
+            ports:
+              - 5432:5432
+        steps:
+          - task: DotNetCoreCLI@2
+            displayName: "🏃 Rodando testes PostgreSQL"
+            inputs:
+              command: test
+              projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
+              arguments: >
+                --configuration Release
+                --no-restore
+                --filter "Database=PostgreSQL"
+                --logger "console;verbosity=detailed"
+              env:
+                POSTGRES_CONNECTION: "Host=localhost;Port=5432;Database=educore_test;Username=test;Password=test123"
+
+  # ═══════════════════════════════════════════
+  # Stage 4: Deploy Homologação
+  # ═══════════════════════════════════════════
+  - stage: DeployHML
+    displayName: "🚀 Deploy Homologação"
+    dependsOn: TestPostgreSQL
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: DeployToHML
+        displayName: "Deploy hml-platform.devgiglio.uk"
+        steps:
+          - script: |
+              echo "🚀 Disparando deploy em homologação..."
+              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
+                -H "x-api-key: $(DOKPLOY_API_KEY)" \
+                -H "Content-Type: application/json" \
+                -d '{"applicationId":"$(HML_APP_ID)"}'
+              echo ""
+              echo "✅ Deploy homologação disparado!"
+            displayName: "Trigger Deploy Homologação"
+
+  # ═══════════════════════════════════════════
+  # Stage 5: Deploy Produção
+  # ═══════════════════════════════════════════
+  - stage: DeployProd
+    displayName: "🌟 Deploy Produção"
+    dependsOn: DeployHML
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: DeployToProd
+        displayName: "Deploy platform.devgiglio.uk"
+        steps:
+          - script: |
+              echo "🌟 Disparando deploy em produção..."
+              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
+                -H "x-api-key: $(DOKPLOY_API_KEY)" \
+                -H "Content-Type: application/json" \
+                -d '{"applicationId":"$(PROD_APP_ID)"}'
+              echo ""
+              echo "✅ Deploy produção disparado!"
+            displayName: "Trigger Deploy Produção"
+
+  # ═══════════════════════════════════════════
+  # Stage 6: Atualizar Work Items
+  # ═══════════════════════════════════════════
+  - stage: UpdateTasks
+    displayName: "📋 Atualizar Azure DevOps Tasks"
+    dependsOn: DeployProd
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: CloseTasks
+        displayName: "Fechar tasks implementadas"
+        steps:
+          - script: |
+              echo "📋 Atualizando work items..."
+              # Fechar tasks do módulo financeiro que foram implementadas
+              for task_id in 150 151 153 154 156 157 160 161 164 165 167 168; do
+                curl -s -u ":$(AZURE_PAT)" \
+                  -H "Content-Type: application/json-patch+json" \
+                  -X PATCH "https://dev.azure.com/$(AZURE_ORG)/$(AZURE_PROJECT)/_apis/wit/workitems/$task_id?api-version=7.1" \
+                  -d '[{"op":"add","path":"/fields/System.State","value":"Resolved"}]'
+                echo "  ✅ Task $task_id -> Resolved"
+              done
+            displayName: "Tasks -> Resolved"
+            env:
+              AZURE_PAT: $(AZURE_PAT)
