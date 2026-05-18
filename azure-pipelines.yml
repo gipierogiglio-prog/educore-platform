@@ -1,6 +1,4 @@
 # Azure Pipelines — EduCore Platform
-# Pipeline: Build -> Test -> Deploy (HML + PROD)
-# Checkout manual com PAT para bypassar service connection
 
 trigger:
   branches:
@@ -55,59 +53,57 @@ stages:
               publishWebProjects: false
               projects: "src/api/Gateway/Educore.Api.csproj"
               arguments: "--configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app"
-              zipAfterPublish: false
-          - task: PublishBuildArtifacts@1
-            displayName: "📤 Upload Artifacts"
-            inputs:
-              pathToPublish: "$(Build.ArtifactStagingDirectory)"
-              artifactName: "educore-platform"
 
-  - stage: TestSQLite
-    displayName: "🧪 Testes SQLite"
+  - stage: Test
+    displayName: "🧪 Testes"
     dependsOn: Build
     condition: succeeded()
     jobs:
       - job: SQLiteTests
-        displayName: "34 testes de integração"
+        displayName: "34 testes SQLite"
         steps:
+          - checkout: none
+          - script: |
+              git clone --branch main --depth 1 \
+                https://x-access-token:$(GH_PAT)@github.com/gipierogiglio-prog/educore-platform.git .
+            displayName: "📥 Git Clone"
+            env:
+              GH_PAT: $(GH_PAT)
           - task: DotNetCoreCLI@2
             displayName: "🏃 Rodando testes"
             inputs:
               command: test
               projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
               arguments: >
-                --configuration Release --no-restore
+                --configuration Release
                 --filter "FullyQualifiedName!~Postgres"
                 --logger "console;verbosity=detailed"
 
-  - stage: DeployHML
-    displayName: "🚀 Deploy HML"
-    dependsOn: TestSQLite
+  - stage: Deploy
+    displayName: "🚀 Deploy"
+    dependsOn: Test
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: DeployHML
-        displayName: "hml-platform.devgiglio.uk"
+        displayName: "HML: hml-platform.devgiglio.uk"
         steps:
+          - checkout: none
           - script: |
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
                 -H "x-api-key: $(DOKPLOY_API_KEY)" \
                 -H "Content-Type: application/json" \
                 -d '{"applicationId":"$(HML_APP_ID)"}'
-              echo "✅ HML deploy disparado!"
-            displayName: "Trigger Deploy HML"
-
-  - stage: DeployProd
-    displayName: "🌟 Deploy PROD"
-    dependsOn: DeployHML
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
+              echo "✅ HML deploy OK"
+            displayName: "Deploy HML"
       - job: DeployProd
-        displayName: "platform.devgiglio.uk"
+        displayName: "PROD: platform.devgiglio.uk"
+        dependsOn: DeployHML
         steps:
+          - checkout: none
           - script: |
               curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
                 -H "x-api-key: $(DOKPLOY_API_KEY)" \
                 -H "Content-Type: application/json" \
                 -d '{"applicationId":"$(PROD_APP_ID)"}'
-              echo "✅ PROD deploy disparado!"
-            displayName: "Trigger Deploy PROD"
+              echo "✅ PROD deploy OK"
+            displayName: "Deploy PROD"
