@@ -22,20 +22,17 @@ stages:
         displayName: "Build + Test + Docker Push"
         steps:
           - checkout: self
-
           - task: DotNetCoreCLI@2
             displayName: "📦 Restore"
             inputs:
               command: restore
               projects: "**/*.csproj"
-
           - task: DotNetCoreCLI@2
             displayName: "🔨 Build"
             inputs:
               command: build
               projects: "**/*.csproj"
               arguments: "--configuration Release --no-restore"
-
           - task: DotNetCoreCLI@2
             displayName: "🧪 Testes SQLite"
             inputs:
@@ -44,7 +41,6 @@ stages:
               arguments: >
                 --configuration Release --no-restore
                 --filter "FullyQualifiedName!~Postgres"
-
           - task: DotNetCoreCLI@2
             displayName: "📦 Publish"
             inputs:
@@ -52,14 +48,12 @@ stages:
               publishWebProjects: false
               projects: "src/api/Gateway/Educore.Api.csproj"
               arguments: "--configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app"
-
           - script: |
               cp Dockerfile.prod $(Build.ArtifactStagingDirectory)/app/Dockerfile
               cd $(Build.ArtifactStagingDirectory)/app
               echo "$(GH_PAT)" | docker login ghcr.io -u gipierogiglio-prog --password-stdin
               docker build -t $(IMAGE_NAME):latest .
               docker push $(IMAGE_NAME):latest
-              echo "✅ Imagem no ghcr.io!"
             displayName: "🐳 Build & Push Docker"
             env:
               GH_PAT: $(GH_PAT)
@@ -73,11 +67,15 @@ stages:
         displayName: "hml-platform.devgiglio.uk"
         steps:
           - script: |
-              echo "🔧 Instalando sshpass..."
               sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-              echo "🚀 Deploy HML via SSH..."
-              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "docker pull $(IMAGE_NAME):latest && docker stop educore-hml 2>/dev/null || true && docker rm educore-hml 2>/dev/null || true && docker run -d --name educore-hml --restart unless-stopped --network dokploy-network -l traefik.enable=true -l traefik.http.routers.educore-hml.rule=Host(hml-platform.devgiglio.uk) -l traefik.http.routers.educore-hml.entrypoints=websecure -l traefik.http.services.educore-hml.loadbalancer.server.port=8080 -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt $(IMAGE_NAME):latest"
-              echo "✅ HML OK"
+              echo "$(SSH_PASSWORD)" > /tmp/sshpass.txt
+              cat > /tmp/deploy-hml.sh << 'DEPLOY_SCRIPT'
+              docker pull ghcr.io/gipierogiglio-prog/educore-platform:latest
+              docker stop educore-hml 2>/dev/null; docker rm educore-hml 2>/dev/null; true
+              docker run -d --name educore-hml --restart unless-stopped                 --network dokploy-network                 -l traefik.enable=true                 -l "traefik.http.routers.educore-hml.rule=Host(hml-platform.devgiglio.uk)"                 -l traefik.http.routers.educore-hml.entrypoints=websecure                 -l "traefik.http.services.educore-hml.loadbalancer.server.port=8080"                 -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt                 ghcr.io/gipierogiglio-prog/educore-platform:latest
+              DEPLOY_SCRIPT
+              sshpass -f /tmp/sshpass.txt ssh -o StrictHostKeyChecking=no root@173.249.60.169 'bash -s' < /tmp/deploy-hml.sh
+              echo "✅ HML deploy OK"
             displayName: "SSH Deploy HML"
 
   - stage: DeployPROD
@@ -93,7 +91,11 @@ stages:
             deploy:
               steps:
                 - script: |
-                    echo "🌟 Deploy PROD via SSH..."
-                    sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "docker pull $(IMAGE_NAME):latest && docker stop educore-platform 2>/dev/null || true && docker rm educore-platform 2>/dev/null || true && docker run -d --name educore-platform --restart unless-stopped --network dokploy-network -l traefik.enable=true -l traefik.http.routers.educore-platform.rule=Host(platform.devgiglio.uk) -l traefik.http.routers.educore-platform.entrypoints=websecure -l traefik.http.services.educore-platform.loadbalancer.server.port=8080 -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt $(IMAGE_NAME):latest"
-                    echo "✅ PROD OK"
+                    cat > /tmp/deploy-prod.sh << 'DEPLOY_SCRIPT'
+                    docker pull ghcr.io/gipierogiglio-prog/educore-platform:latest
+                    docker stop educore-platform 2>/dev/null; docker rm educore-platform 2>/dev/null; true
+                    docker run -d --name educore-platform --restart unless-stopped                       --network dokploy-network                       -l traefik.enable=true                       -l "traefik.http.routers.educore-platform.rule=Host(platform.devgiglio.uk)"                       -l traefik.http.routers.educore-platform.entrypoints=websecure                       -l "traefik.http.services.educore-platform.loadbalancer.server.port=8080"                       -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt                       ghcr.io/gipierogiglio-prog/educore-platform:latest
+                    DEPLOY_SCRIPT
+                    sshpass -f /tmp/sshpass.txt ssh -o StrictHostKeyChecking=no root@173.249.60.169 'bash -s' < /tmp/deploy-prod.sh
+                    echo "✅ PROD deploy OK"
                   displayName: "SSH Deploy PROD"
