@@ -23,4 +23,7 @@
     <ProjectReference Include="..\..\building-blocks\Database\Educore.Database.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\modules\Financial\Educore.Financial.csproj" />
+  </ItemGroup>
 </Project>
