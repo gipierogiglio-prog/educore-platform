@@ -1,5 +1,5 @@
 # Azure Pipelines — EduCore Platform
-# Build → Test → Docker Push → SSH Deploy (HML + PROD)
+# Build → Test → SSH Deploy (tar + docker build direto no servidor)
 
 trigger:
   branches:
@@ -19,7 +19,7 @@ stages:
     displayName: "🔨 Build"
     jobs:
       - job: Build
-        displayName: "Build + Test + Docker Push"
+        displayName: "Build + Test + Deploy"
         steps:
           - checkout: self
           - task: DotNetCoreCLI@2
@@ -48,54 +48,33 @@ stages:
               publishWebProjects: false
               projects: "src/api/Gateway/Educore.Api.csproj"
               arguments: "--configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app"
+
           - script: |
+              echo "🔧 Instalando sshpass..."
+              sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+              # Prepara Dockerfile + publish num tar
               cp Dockerfile.prod $(Build.ArtifactStagingDirectory)/app/Dockerfile
               cd $(Build.ArtifactStagingDirectory)/app
-              echo "$(GH_PAT)" | docker login ghcr.io -u gipierogiglio-prog --password-stdin
-              docker build -t $(IMAGE_NAME):latest .
-              docker push $(IMAGE_NAME):latest
-            displayName: "🐳 Build & Push Docker"
-            env:
-              GH_PAT: $(GH_PAT)
+              tar czf /tmp/app.tar.gz .
 
-  - stage: DeployHML
-    displayName: "🚀 Deploy HML"
-    dependsOn: Build
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
-      - job: DeployHML
-        displayName: "hml-platform.devgiglio.uk"
-        steps:
-          - script: |
-              sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-              echo "$(SSH_PASSWORD)" > /tmp/sshpass.txt
-              cat > /tmp/deploy-hml.sh << 'DEPLOY_SCRIPT'
-              docker pull ghcr.io/gipierogiglio-prog/educore-platform:latest
-              docker stop educore-hml 2>/dev/null; docker rm educore-hml 2>/dev/null; true
-              docker run -d --name educore-hml --restart unless-stopped                 --network dokploy-network                 -l traefik.enable=true                 -l "traefik.http.routers.educore-hml.rule=Host(hml-platform.devgiglio.uk)"                 -l traefik.http.routers.educore-hml.entrypoints=websecure                 -l "traefik.http.services.educore-hml.loadbalancer.server.port=8080"                 -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt                 ghcr.io/gipierogiglio-prog/educore-platform:latest
-              DEPLOY_SCRIPT
-              sshpass -f /tmp/sshpass.txt ssh -o StrictHostKeyChecking=no root@173.249.60.169 'bash -s' < /tmp/deploy-hml.sh
-              echo "✅ HML deploy OK"
-            displayName: "SSH Deploy HML"
+              # Envia tar via SSH e builda direto no servidor
+              echo "🚀 Enviando build para HML..."
+              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "mkdir -p /opt/educore-hml"
+              sshpass -p '$(SSH_PASSWORD)' scp -o StrictHostKeyChecking=no /tmp/app.tar.gz $(SSH_USER)@$(SSH_HOST):/opt/educore-hml/
+              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+                cd /opt/educore-hml && tar xzf app.tar.gz && rm app.tar.gz &&                 docker build -t educore-hml:latest . &&                 docker stop educore-hml 2>/dev/null || true &&                 docker rm educore-hml 2>/dev/null || true &&                 docker run -d --name educore-hml --restart unless-stopped                   --network dokploy-network                   -l traefik.enable=true                   -l 'traefik.http.routers.educore-hml.rule=Host(hml-platform.devgiglio.uk)'                   -l traefik.http.routers.educore-hml.entrypoints=websecure                   -l 'traefik.http.services.educore-hml.loadbalancer.server.port=8080'                   -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt                   educore-hml:latest
+              "
+              echo "✅ HML deploy OK!"
 
-  - stage: DeployPROD
-    displayName: "🌟 Deploy PROD"
-    dependsOn: DeployHML
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
-      - deployment: DeployPROD
-        displayName: "platform.devgiglio.uk"
-        environment: production
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - script: |
-                    cat > /tmp/deploy-prod.sh << 'DEPLOY_SCRIPT'
-                    docker pull ghcr.io/gipierogiglio-prog/educore-platform:latest
-                    docker stop educore-platform 2>/dev/null; docker rm educore-platform 2>/dev/null; true
-                    docker run -d --name educore-platform --restart unless-stopped                       --network dokploy-network                       -l traefik.enable=true                       -l "traefik.http.routers.educore-platform.rule=Host(platform.devgiglio.uk)"                       -l traefik.http.routers.educore-platform.entrypoints=websecure                       -l "traefik.http.services.educore-platform.loadbalancer.server.port=8080"                       -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt                       ghcr.io/gipierogiglio-prog/educore-platform:latest
-                    DEPLOY_SCRIPT
-                    sshpass -f /tmp/sshpass.txt ssh -o StrictHostKeyChecking=no root@173.249.60.169 'bash -s' < /tmp/deploy-prod.sh
-                    echo "✅ PROD deploy OK"
-                  displayName: "SSH Deploy PROD"
+              # Deploy PROD (se for branch main)
+              if [ '$(Build.SourceBranch)' = 'refs/heads/main' ]; then
+                echo "🚀 Enviando build para PROD..."
+                sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "mkdir -p /opt/educore-prod"
+                sshpass -p '$(SSH_PASSWORD)' scp -o StrictHostKeyChecking=no /tmp/app.tar.gz $(SSH_USER)@$(SSH_HOST):/opt/educore-prod/
+                sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+                  cd /opt/educore-prod && tar xzf app.tar.gz && rm app.tar.gz &&                   docker build -t educore-prod:latest . &&                   docker stop educore-platform 2>/dev/null || true &&                   docker rm educore-platform 2>/dev/null || true &&                   docker run -d --name educore-platform --restart unless-stopped                     --network dokploy-network                     -l traefik.enable=true                     -l 'traefik.http.routers.educore-platform.rule=Host(platform.devgiglio.uk)'                     -l traefik.http.routers.educore-platform.entrypoints=websecure                     -l 'traefik.http.services.educore-platform.loadbalancer.server.port=8080'                     -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt                     educore-prod:latest
+                "
+                echo "✅ PROD deploy OK!"
+              fi
+            displayName: "🐳 Build + SCP + Docker Deploy (HML + PROD)"
