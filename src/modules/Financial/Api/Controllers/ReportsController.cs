@@ -1,6 +1,7 @@
 using Giglio.EduCore.Financial.Application.Queries.ExpenseReports;
 using Giglio.EduCore.Financial.Domain.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 
 namespace Giglio.EduCore.Financial.Api.Controllers;
 

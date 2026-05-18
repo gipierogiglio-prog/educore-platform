@@ -27,7 +27,7 @@ public class PaymentRepository : IPaymentRepository
             .AsQueryable();
 
         if (!includeCancelled)
-            query = query.Where(x => !x.IsCancelled);
+            query = query.Where(x => x.CancelledAt == null);
 
         return await query
             .OrderByDescending(x => x.PaymentDate)
@@ -42,13 +42,16 @@ public class PaymentRepository : IPaymentRepository
             .CountAsync(x => x.MonthlyChargeId == monthlyChargeId, ct);
 
     public async Task<decimal> GetActiveTotalByChargeIdAsync(Guid monthlyChargeId, CancellationToken ct = default)
-        => await _context.Payments
-            .Where(x => x.MonthlyChargeId == monthlyChargeId && !x.IsCancelled)
-            .SumAsync(x => (decimal?)x.Value) ?? 0m;
+    {
+        var total = await _context.Payments
+            .Where(x => x.MonthlyChargeId == monthlyChargeId && x.CancelledAt == null)
+            .SumAsync(x => (double?)x.Value, ct);
+        return (decimal)(total ?? 0);
+    }
 
     public async Task<bool> HasActivePaymentsByChargeIdAsync(Guid monthlyChargeId, CancellationToken ct = default)
         => await _context.Payments
-            .AnyAsync(x => x.MonthlyChargeId == monthlyChargeId && !x.IsCancelled, ct);
+            .AnyAsync(x => x.MonthlyChargeId == monthlyChargeId && x.CancelledAt == null, ct);
 
     public void Add(Payment payment)
     {

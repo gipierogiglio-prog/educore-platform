@@ -40,7 +40,6 @@ public static class DependencyInjection
         services.AddScoped<GetPaymentDetailQueryHandler>();
         services.AddScoped<GetExpenseReportHandler>();
         services.AddScoped<GetExpenseReportQueryValidator>();
-        services.AddScoped<GetInadimplenciaByClassQueryHandler>();
 
         // Background Jobs
         services.AddHostedService<MonthlyChargeGenerationJob>();

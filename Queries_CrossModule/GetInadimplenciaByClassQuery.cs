@@ -62,7 +62,7 @@ public sealed class GetInadimplenciaByClassQueryHandler
                 _appDb.Students,
                 e => e.StudentId,
                 s => s.Id,
-                (e, s) => new { e.Id, s.Id as StudentId, s.Enrollment, s.UserId })
+                (e, s) => new { e.Id, StudentId = s.Id, s.Enrollment, s.UserId })
             .Join(
                 _appDb.Users,
                 x => x.UserId,

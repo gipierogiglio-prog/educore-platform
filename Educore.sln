@@ -21,7 +21,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Educore.Academic", "src\mod
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Educore.Grading", "src\modules\Grading\Educore.Grading.csproj", "{64642948-26DE-47A3-A2C1-B5DF2F84A436}"
 		{C8AEE3E0-45B5-490D-A680-0E40DB6D23A4} = {FEDC3069-5AA8-43AA-A1E7-62F6EF166DE7}
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Educore.Financial", "src\modules\Financial\Educore.Financial.csproj", "{C8AEE3E0-45B5-490D-A680-0E40DB6D23A4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Educore.Financial", "src\modules\Financial\Educore.Financial.csprojProject("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EduCore.Financial.IntegrationTests", "tests\Financial.IntegrationTests\EduCore.Financial.IntegrationTests.csproj", "{650D2E3E-DAD6-4FCE-A4A8-B7F98B978F06}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EduCore.Financial.IntegrationTests", "tests\Financial.IntegrationTests\EduCore.Financial.IntegrationTests.csproj", "{650D2E3E-DAD6-4FCE-A4A8-B7F98B978F06}"
+EndProject
+", "{C8AEE3E0-45B5-490D-A680-0E40DB6D23A4}"
 EndProject
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{DEC964E9-A974-468D-AEB4-F80EF5B81D93}"

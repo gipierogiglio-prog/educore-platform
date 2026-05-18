@@ -74,7 +74,7 @@ public class PaymentsController : ControllerBase
         [FromQuery] bool includeCancelled = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        CancellationToken ct)
+        CancellationToken ct = default)
     {
         if (monthlyChargeId == Guid.Empty)
             return BadRequest(new { error = "monthlyChargeId is required" });

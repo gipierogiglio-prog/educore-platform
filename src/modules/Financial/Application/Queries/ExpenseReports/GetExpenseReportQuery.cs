@@ -1,7 +1,9 @@
 using Giglio.EduCore.Financial.Application.DTOs;
+using Giglio.EduCore.Financial.Domain.Entities;
 using Giglio.EduCore.Financial.Domain.Enums;
 using Giglio.EduCore.Financial.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Giglio.EduCore.Financial.Application.Queries.ExpenseReports;
 
@@ -147,7 +149,7 @@ public class GetExpenseReportHandler
     private async Task<PagedResult<ExpenseDetailDto>> GetExpensesPagedAsync(
         GetExpenseReportQuery query, CancellationToken ct)
     {
-        var baseQuery = BuildBaseQuery(query)
+        IQueryable<Expense> baseQuery = BuildBaseQuery(query)
             .Include(e => e.Category);
 
         if (!string.IsNullOrWhiteSpace(query.Status) &&
