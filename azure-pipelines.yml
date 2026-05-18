@@ -1,5 +1,5 @@
 # Azure Pipelines — EduCore Platform
-# Build → Test → Docker Image → Deploy
+# Build → Test → Docker Push → SSH Deploy (HML + PROD)
 
 trigger:
   branches:
@@ -10,10 +10,6 @@ variables:
   - group: educore-platform-vars
   - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
     value: 1
-  - name: DOKPLOY_URL
-    value: "https://dokploy.devgiglio.com"
-  - name: IMAGE_NAME
-    value: "ghcr.io/gipierogiglio-prog/educore-platform"
 
 pool:
   vmImage: ubuntu-latest
@@ -63,8 +59,8 @@ stages:
               echo "$(GH_PAT)" | docker login ghcr.io -u gipierogiglio-prog --password-stdin
               docker build -t $(IMAGE_NAME):latest .
               docker push $(IMAGE_NAME):latest
-              echo "✅ Imagem enviada para ghcr.io!"
-            displayName: "🐳 Build & Push Docker Image"
+              echo "✅ Imagem no ghcr.io!"
+            displayName: "🐳 Build & Push Docker"
             env:
               GH_PAT: $(GH_PAT)
 
@@ -77,12 +73,15 @@ stages:
         displayName: "hml-platform.devgiglio.uk"
         steps:
           - script: |
-              curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
-                -H "x-api-key: $(DOKPLOY_API_KEY)" \
-                -H "Content-Type: application/json" \
-                -d '{"applicationId":"$(HML_APP_ID)"}'
-              echo "✅ HML deploy OK"
-            displayName: "Deploy HML"
+              echo "🚀 Deploy HML via SSH..."
+              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+                docker pull $(IMAGE_NAME):latest
+                docker stop educore-hml 2>/dev/null || true
+                docker rm educore-hml 2>/dev/null || true
+                docker run -d --name educore-hml --restart unless-stopped -p 8081:8080 $(IMAGE_NAME):latest
+                echo '✅ HML container rodando'
+              "
+            displayName: "SSH Deploy HML"
 
   - stage: DeployPROD
     displayName: "🌟 Deploy PROD"
@@ -97,9 +96,12 @@ stages:
             deploy:
               steps:
                 - script: |
-                    curl -s -X POST "$(DOKPLOY_URL)/api/application.deploy" \
-                      -H "x-api-key: $(DOKPLOY_API_KEY)" \
-                      -H "Content-Type: application/json" \
-                      -d '{"applicationId":"$(PROD_APP_ID)"}'
-                    echo "✅ PROD deploy OK"
-                  displayName: "Deploy PROD"
+                    echo "🌟 Deploy PROD via SSH..."
+                    sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
+                      docker pull $(IMAGE_NAME):latest
+                      docker stop educore-platform 2>/dev/null || true
+                      docker rm educore-platform 2>/dev/null || true
+                      docker run -d --name educore-platform --restart unless-stopped -p 8080:8080 $(IMAGE_NAME):latest
+                      echo '✅ PROD container rodando'
+                    "
+                  displayName: "SSH Deploy PROD"
