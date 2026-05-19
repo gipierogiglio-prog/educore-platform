@@ -21,7 +21,7 @@ RUN dotnet restore src/api/Gateway/Educore.Api.csproj && \
 COPY . .
 
 # Build
-RUN dotnet build --configuration Release --no-restore
+RUN dotnet build --configuration Release
 
 # ──────────────────────────────────────────────────
 # Stage 1: Test Runner — usado em homologação
