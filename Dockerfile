@@ -10,6 +10,8 @@ COPY src/modules/Secretary/Educore.Secretary.csproj src/modules/Secretary/
 COPY src/modules/Academic/Educore.Academic.csproj src/modules/Academic/
 COPY src/modules/Grading/Educore.Grading.csproj src/modules/Grading/
 COPY src/modules/Financial/Educore.Financial.csproj src/modules/Financial/
+COPY src/modules/DailyRoutines/Educore.DailyRoutines.csproj src/modules/DailyRoutines/
+COPY src/modules/Disciplinary/Educore.Disciplinary.csproj src/modules/Disciplinary/
 COPY src/api/Gateway/Educore.Api.csproj src/api/Gateway/
 COPY tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj tests/Financial.IntegrationTests/
 RUN dotnet restore src/api/Gateway/Educore.Api.csproj && \
