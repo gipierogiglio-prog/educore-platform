@@ -221,6 +221,121 @@ Indicadores da organização.
 
 ---
 
+## 📥 Importação CSV/Excel
+
+### POST /api/students/import/preview
+Preview de arquivo CSV/Excel de alunos — retorna dados parseados para revisão.
+**Multipart form-data:** `file` (.csv ou .xlsx)
+
+```json
+// Response:
+{
+  "totalRows": 50,
+  "rows": [
+    { "name": "João Silva", "email": "joao@email.com", "password": null, "phone": "11999999999" }
+  ],
+  "existingEmails": ["joao@email.com"]
+}
+```
+
+### POST /api/students/import/execute
+Confirmar e executar a importação de alunos.
+**Multipart form-data:** `file` (.csv ou .xlsx)
+
+```json
+// Response:
+{
+  "imported": 48,
+  "skipped": 2,
+  "errors": ["Linha 3: Nome ou email vazio"],
+  "totalInFile": 50
+}
+```
+
+### POST /api/teachers/import/preview
+Preview de arquivo CSV/Excel de professores.
+**Multipart form-data:** `file` (.csv ou .xlsx)
+
+### POST /api/teachers/import/execute
+Confirmar e executar a importação de professores.
+**Multipart form-data:** `file` (.csv ou .xlsx)
+
+**Formato do CSV/Excel:**
+- **Alunos:** `nome`, `email`, `senha` (opcional), `telefone` (opcional)
+- **Professores:** `nome`, `email`, `senha` (opcional), `telefone` (opcional), `especialização` (opcional)
+- Colunas podem estar em português ou inglês
+- Senha padrão: `123456` (se não informada)
+- Emails duplicados são ignorados automaticamente
+
+---
+
+## 👨‍🏫 Dashboard do Professor
+
+### GET /api/dashboard/teacher
+Dashboard específico do professor autenticado. **Requer role `teacher`.**
+
+```json
+{
+  "teacherId": "guid",
+  "specialization": "Matemática",
+  "hireDate": "2024-01-15T00:00:00Z",
+  "totalClasses": 3,
+  "totalSubjects": 2,
+  "classes": [
+    {
+      "classId": "guid",
+      "className": "3º Ano A",
+      "subjects": [
+        { "subjectId": "guid", "subjectName": "Matemática" }
+      ]
+    }
+  ],
+  "studentCountByClass": [
+    { "className": "3º Ano A", "count": 35 }
+  ],
+  "recentGrades": [
+    { "studentId": "guid", "studentName": "João", "subjectId": "guid", "bimester": 1, "value": 8.5, "recoveryValue": null }
+  ],
+  "attendanceLast30Days": [
+    { "className": "3º Ano A", "total": 100, "present": 92, "absent": 8 }
+  ]
+}
+```
+
+---
+
+## 👪 Visão do Responsável
+
+### GET /api/dashboard/guardian
+Dashboard do responsável pelos alunos. **Requer role `guardian`.**
+
+```json
+{
+  "guardianId": "guid",
+  "relationship": "Pai",
+  "children": [
+    {
+      "id": "guid",
+      "name": "Joãozinho",
+      "email": "joaozinho@email.com",
+      "enrollment": "STU20260001",
+      "className": "3º Ano A",
+      "grades": [
+        { "subjectName": "Matemática", "bimester": 1, "value": 8.5, "recoveryValue": null }
+      ],
+      "attendance": {
+        "total": 80,
+        "present": 72,
+        "absent": 8,
+        "frequencyPercent": 90.0
+      }
+    }
+  ]
+}
+```
+
+---
+
 ## 📋 Regras de Frontend (para IA)
 
 ### Telas necessárias (MVP):
