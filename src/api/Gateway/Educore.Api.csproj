@@ -28,5 +28,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\modules\Financial\Educore.Financial.csproj" />
     <ProjectReference Include="..\..\modules\DailyRoutines\Educore.DailyRoutines.csproj" />
+    <ProjectReference Include="..\..\modules\Disciplinary\Educore.Disciplinary.csproj" />
   </ItemGroup>
 </Project>
