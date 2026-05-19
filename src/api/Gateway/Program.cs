@@ -1,7 +1,10 @@
 using System.Text;
 using Educore.Database;
+using Giglio.EduCore.Academic;
 using Giglio.EduCore.DailyRoutines;
 using Giglio.EduCore.Disciplinary;
+using Giglio.EduCore.Financial;
+using Giglio.EduCore.Organization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -34,6 +37,9 @@ builder.Services.AddAuthorization();
 // Register Modules
 var connStrForModules = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Host=localhost;Database=educore;Username=postgres;Password=postgres";
 builder.Services.AddDailyRoutinesModule(builder.Configuration, connStrForModules!);
+builder.Services.AddAcademicModule(builder.Configuration, connStrForModules!);
+builder.Services.AddFinancialModule(builder.Configuration, connStrForModules!);
+builder.Services.AddOrganizationModule(builder.Configuration, connStrForModules!);
 
 builder.Services.AddControllers();
 
