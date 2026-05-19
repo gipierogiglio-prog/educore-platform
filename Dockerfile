@@ -35,7 +35,6 @@ CMD ["bash", "scripts/deploy-pipeline.sh"]
 FROM build AS publish
 RUN dotnet publish src/api/Gateway/Educore.Api.csproj \
     --configuration Release \
-    --no-build \
     -o /out
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS production
