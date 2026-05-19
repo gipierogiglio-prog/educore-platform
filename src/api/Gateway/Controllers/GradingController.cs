@@ -137,6 +137,196 @@ public class GradingController : ControllerBase
         return Ok(results);
     }
 
+    // === BOLETIM CONSOLIDADO do aluno ===
+    [HttpGet("students/{studentId}/report")]
+    public async Task<IActionResult> GetStudentReport(Guid studentId, [FromQuery] int? year)
+    {
+        var oid = OrgId; if (oid == null) return BadRequest(new { message = "Sem organização" });
+        var y = year ?? DateTime.UtcNow.Year;
+
+        // Student data
+        var student = await _db.Students
+            .FirstOrDefaultAsync(s => s.Id == studentId && s.OrganizationId == oid);
+        if (student == null)
+            return NotFound(new { message = "Aluno não encontrado" });
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == student.UserId);
+
+        // Class data
+        var classData = await _db.Classes
+            .FirstOrDefaultAsync(c => c.Id == student.ClassId);
+
+        // Enrollment
+        var enrollment = await _db.Enrollments
+            .FirstOrDefaultAsync(e => e.StudentId == studentId && e.SchoolYear == y);
+
+        // Subjects for this class
+        var subjectIds = await _db.TeacherSubjects
+            .Where(ts => ts.ClassId == student.ClassId)
+            .Select(ts => ts.SubjectId)
+            .Distinct()
+            .ToListAsync();
+
+        var subjects = await _db.Subjects
+            .Where(s => subjectIds.Contains(s.Id))
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
+        // Grades per subject per bimester (simple grades table)
+        var allGrades = await _db.Grades
+            .Where(g => g.StudentId == studentId && g.SchoolYear == y)
+            .ToListAsync();
+
+        // Grading rules entries
+        var rules = await _db.GradeRules
+            .Where(r => r.OrganizationId == oid && r.Active)
+            .Include(r => r.Components.OrderBy(c => c.Order))
+            .ToListAsync();
+
+        var defaultRule = rules.FirstOrDefault();
+
+        var allEntries = defaultRule != null
+            ? await _db.GradeEntries
+                .Where(e => e.StudentId == studentId && e.SchoolYear == y)
+                .ToListAsync()
+            : new List<GradeEntry>();
+
+        // Build subject report per bimester
+        var subjectsReport = new List<object>();
+        decimal totalFinalAverage = 0;
+        int subjectCount = 0;
+
+        foreach (var subject in subjects)
+        {
+            var bimesterGrades = new List<object>();
+            decimal subjectFinalSum = 0;
+            int bimestersWithGrades = 0;
+
+            for (int b = 1; b <= 4; b++)
+            {
+                // Simple grade for this subject/bimester
+                var simpleGrade = allGrades
+                    .FirstOrDefault(g => g.SubjectId == subject.Id && g.Bimester == b);
+
+                // Grading entries for this subject (via shared component lookup)
+                decimal? calculatedAverage = null;
+                if (defaultRule != null && defaultRule.Components.Any())
+                {
+                    decimal totalWeight = 0, totalValue = 0;
+                    foreach (var comp in defaultRule.Components)
+                    {
+                        var entry = allEntries
+                            .FirstOrDefault(e => e.GradeRuleComponentId == comp.Id && e.Bimester == b);
+
+                        if (entry?.Value != null)
+                        {
+                            var val = entry.RecoveryValue ?? entry.Value.Value;
+                            totalValue += val * comp.Weight;
+                            totalWeight += comp.Weight;
+                        }
+                    }
+                    if (totalWeight > 0)
+                        calculatedAverage = Math.Round(totalValue / totalWeight, 2);
+                }
+
+                var bimesterValue = calculatedAverage ?? simpleGrade?.Value;
+                var bimesterRecovery = simpleGrade?.RecoveryValue;
+
+                bimesterGrades.Add(new
+                {
+                    bimester = b,
+                    value = bimesterValue,
+                    recoveryValue = bimesterRecovery,
+                    hasRecoveryGrade = simpleGrade?.RecoveryValue != null
+                });
+
+                if (bimesterValue.HasValue)
+                {
+                    subjectFinalSum += bimesterValue.Value;
+                    bimestersWithGrades++;
+                }
+            }
+
+            var finalAverage = bimestersWithGrades > 0
+                ? Math.Round(subjectFinalSum / bimestersWithGrades, 2)
+                : (decimal?)null;
+
+            var passingGrade = 6m;
+            var status = !finalAverage.HasValue ? "pending"
+                : finalAverage >= passingGrade ? "approved"
+                : finalAverage >= 4m ? "recovery" : "reproved";
+
+            subjectsReport.Add(new
+            {
+                subjectId = subject.Id,
+                subjectName = subject.Name,
+                subjectCode = subject.Code,
+                workload = subject.Workload,
+                finalAverage,
+                passingGrade,
+                status,
+                bimesters = bimesterGrades
+            });
+
+            if (finalAverage.HasValue)
+            {
+                totalFinalAverage += finalAverage.Value;
+                subjectCount++;
+            }
+        }
+
+        var overallAverage = subjectCount > 0
+            ? Math.Round(totalFinalAverage / subjectCount, 2)
+            : (decimal?)null;
+
+        var overallStatus = !overallAverage.HasValue ? "pending"
+            : overallAverage >= 6m ? "approved"
+            : overallAverage >= 4m ? "recovery" : "reproved";
+
+        return Ok(new
+        {
+            student = new
+            {
+                id = student.Id,
+                enrollment = student.Enrollment,
+                name = user?.Name ?? "",
+                email = user?.Email ?? ""
+            },
+            classInfo = classData == null ? null : new
+            {
+                id = classData.Id,
+                name = classData.Name,
+                shift = classData.Shift,
+                year = classData.Year
+            },
+            schoolYear = y,
+            enrollmentStatus = enrollment?.Status ?? "unknown",
+            gradingRule = defaultRule == null ? null : new { defaultRule.Id, defaultRule.Name },
+            subjects = subjectsReport,
+            overall = new
+            {
+                totalSubjects = subjects.Count,
+                approvedCount = subjectsReport.Count(s =>
+                {
+                    var x = (dynamic)s;
+                    return x.status == "approved";
+                }),
+                recoveryCount = subjectsReport.Count(s =>
+                {
+                    var x = (dynamic)s;
+                    return x.status == "recovery";
+                }),
+                reprovedCount = subjectsReport.Count(s =>
+                {
+                    var x = (dynamic)s;
+                    return x.status == "reproved";
+                }),
+                average = overallAverage,
+                status = overallStatus
+            }
+        });
+    }
+
     // === Obter notas de um aluno ===
     [HttpGet("students/{studentId}/grades")]
     public async Task<IActionResult> GetStudentGrades(Guid studentId, [FromQuery] int? year)

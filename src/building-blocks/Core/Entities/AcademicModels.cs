@@ -57,3 +57,19 @@ public class Attendance
     public string? Justification { get; set; }
     public Guid OrganizationId { get; set; }
 }
+public class AcademicEvent
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+    public string EventType { get; set; } = "event"; // holiday, exam, activity, event, vacation
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public bool AllDay { get; set; } = false;
+    public string? Color { get; set; }
+    public Guid OrganizationId { get; set; }
+    public Guid? ClassId { get; set; }
+    public Guid? SubjectId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+}

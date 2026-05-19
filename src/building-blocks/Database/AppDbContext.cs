@@ -32,6 +32,9 @@ public class AppDbContext : DbContext
 
     // Grading
     public DbSet<GradeRule> GradeRules => Set<GradeRule>();
+
+    // Academic Events
+    public DbSet<AcademicEvent> AcademicEvents => Set<AcademicEvent>();
     public DbSet<GradeRuleComponent> GradeRuleComponents => Set<GradeRuleComponent>();
     public DbSet<GradeEntry> GradeEntries => Set<GradeEntry>();
     public DbSet<GradeResult> GradeResults => Set<GradeResult>();
@@ -59,5 +62,15 @@ public class AppDbContext : DbContext
         mb.Entity<GradeRuleComponent>(e => e.HasKey(x => x.Id));
         mb.Entity<GradeEntry>(e => e.HasKey(x => x.Id));
         mb.Entity<GradeResult>(e => e.HasKey(x => x.Id));
+    mb.Entity<AcademicEvent>(e =>
+    {
+        e.HasKey(x => x.Id);
+        e.Property(x => x.Title).IsRequired().HasMaxLength(300);
+        e.Property(x => x.EventType).IsRequired().HasMaxLength(50);
+        e.Property(x => x.StartDate).IsRequired();
+        e.HasIndex(x => x.OrganizationId).HasDatabaseName("IX_AcademicEvents_OrgId");
+        e.HasIndex(x => new { x.OrganizationId, x.StartDate }).HasDatabaseName("IX_AcademicEvents_OrgId_StartDate");
+        e.HasIndex(x => new { x.OrganizationId, x.EventType }).HasDatabaseName("IX_AcademicEvents_OrgId_Type");
+    });
     }
 }
