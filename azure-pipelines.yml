@@ -1,80 +1,13 @@
-# Azure Pipelines — EduCore Platform
-# Build → Test → SSH Deploy (tar + docker build direto no servidor)
+# Azure Pipelines — DISABLED
+# Pipeline desativada. Deploys feitos via SSH direto no servidor.
+# Ver docs/deploy-pipeline.md para o fluxo atual.
 
-trigger:
-  branches:
-    include:
-      - main
-
-variables:
-  - group: educore-platform-vars
-  - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
-    value: 1
+trigger: none
+pr: none
 
 pool:
   vmImage: ubuntu-latest
 
-stages:
-  - stage: Build
-    displayName: "🔨 Build"
-    jobs:
-      - job: Build
-        displayName: "Build + Test + Deploy"
-        steps:
-          - checkout: self
-          - task: DotNetCoreCLI@2
-            displayName: "📦 Restore"
-            inputs:
-              command: restore
-              projects: "**/*.csproj"
-          - task: DotNetCoreCLI@2
-            displayName: "🔨 Build"
-            inputs:
-              command: build
-              projects: "**/*.csproj"
-              arguments: "--configuration Release --no-restore"
-          - task: DotNetCoreCLI@2
-            displayName: "🧪 Testes SQLite"
-            inputs:
-              command: test
-              projects: "tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj"
-              arguments: >
-                --configuration Release --no-restore
-                --filter "FullyQualifiedName!~Postgres"
-          - task: DotNetCoreCLI@2
-            displayName: "📦 Publish"
-            inputs:
-              command: publish
-              publishWebProjects: false
-              projects: "src/api/Gateway/Educore.Api.csproj"
-              arguments: "--configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app"
-
-          - script: |
-              echo "🔧 Instalando sshpass..."
-              sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-
-              # Prepara Dockerfile + publish num tar
-              cp Dockerfile.prod $(Build.ArtifactStagingDirectory)/app/Dockerfile
-              cd $(Build.ArtifactStagingDirectory)/app
-              tar czf /tmp/app.tar.gz .
-
-              # Envia tar via SSH e builda direto no servidor
-              echo "🚀 Enviando build para HML..."
-              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "mkdir -p /opt/educore-hml"
-              sshpass -p '$(SSH_PASSWORD)' scp -o StrictHostKeyChecking=no /tmp/app.tar.gz $(SSH_USER)@$(SSH_HOST):/opt/educore-hml/
-              sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
-                cd /opt/educore-hml && tar xzf app.tar.gz && rm app.tar.gz &&                 docker build -t educore-hml:latest . &&                 docker stop educore-hml 2>/dev/null || true &&                 docker rm educore-hml 2>/dev/null || true &&                 docker run -d --name educore-hml --restart unless-stopped                   --network dokploy-network                   -l traefik.enable=true                   -l 'traefik.http.routers.educore-hml.rule=Host(hml-platform.devgiglio.uk)'                   -l traefik.http.routers.educore-hml.entrypoints=websecure                   -l 'traefik.http.services.educore-hml.loadbalancer.server.port=8080'                   -l traefik.http.routers.educore-hml.tls.certresolver=letsencrypt                   educore-hml:latest
-              "
-              echo "✅ HML deploy OK!"
-
-              # Deploy PROD (se for branch main)
-              if [ '$(Build.SourceBranch)' = 'refs/heads/main' ]; then
-                echo "🚀 Enviando build para PROD..."
-                sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "mkdir -p /opt/educore-prod"
-                sshpass -p '$(SSH_PASSWORD)' scp -o StrictHostKeyChecking=no /tmp/app.tar.gz $(SSH_USER)@$(SSH_HOST):/opt/educore-prod/
-                sshpass -p '$(SSH_PASSWORD)' ssh -o StrictHostKeyChecking=no $(SSH_USER)@$(SSH_HOST) "
-                  cd /opt/educore-prod && tar xzf app.tar.gz && rm app.tar.gz &&                   docker build -t educore-prod:latest . &&                   docker stop educore-platform 2>/dev/null || true &&                   docker rm educore-platform 2>/dev/null || true &&                   docker run -d --name educore-platform --restart unless-stopped                     --network dokploy-network                     -l traefik.enable=true                     -l 'traefik.http.routers.educore-platform.rule=Host(platform.devgiglio.uk)'                     -l traefik.http.routers.educore-platform.entrypoints=websecure                     -l 'traefik.http.services.educore-platform.loadbalancer.server.port=8080'                     -l traefik.http.routers.educore-platform.tls.certresolver=letsencrypt                     educore-prod:latest
-                "
-                echo "✅ PROD deploy OK!"
-              fi
-            displayName: "🐳 Build + SCP + Docker Deploy (HML + PROD)"
+steps:
+  - script: echo "Pipeline desativada. Deploys via SSH direto."
+    displayName: "⏸️ Pipeline desativada"
