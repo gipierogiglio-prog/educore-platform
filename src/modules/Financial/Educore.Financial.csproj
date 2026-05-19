@@ -18,6 +18,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <Configuration Condition=""$(Configuration)" == ">Release</Configuration>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Giglio.EduCore.Financial</RootNamespace>
