@@ -14,7 +14,8 @@ COPY src/modules/DailyRoutines/Educore.DailyRoutines.csproj src/modules/DailyRou
 COPY src/modules/Disciplinary/Educore.Disciplinary.csproj src/modules/Disciplinary/
 COPY src/api/Gateway/Educore.Api.csproj src/api/Gateway/
 COPY tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj tests/Financial.IntegrationTests/
-RUN dotnet restore Educore.sln
+RUN dotnet restore src/api/Gateway/Educore.Api.csproj && \
+    dotnet restore tests/Financial.IntegrationTests/EduCore.Financial.IntegrationTests.csproj
 
 # Copy everything
 COPY . .
