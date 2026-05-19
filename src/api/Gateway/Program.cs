@@ -39,10 +39,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAn
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Disciplinary module
-var discConnStr = builder.Configuration.GetConnectionString("DefaultConnection");
+// Register Disciplinary module
 if (!string.IsNullOrEmpty(connStr))
-    builder.Services.AddDisciplinaryModule(builder.Configuration, connStr!);
+    builder.Services.AddDisciplinaryModule(builder.Configuration, connStr);
 else
     builder.Services.AddDisciplinaryModule(builder.Configuration, "Data Source=educore.db");
 
