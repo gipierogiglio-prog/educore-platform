@@ -265,7 +265,7 @@ public class DashboardController : ControllerBase
 
         var childrenData = children.Select(child =>
         {
-            var childGrades = grades.FirstOrDefault(g => g.studentId == child.Id)?.grades ?? new List<object>();
+            IEnumerable<dynamic> childGrades = grades.FirstOrDefault(g => g.studentId == child.Id)?.grades ?? Enumerable.Empty<dynamic>();
             var childAttendance = attendance.FirstOrDefault(a => a.studentId == child.Id);
             var childOccurrences = recentOccurrences.Count; // simplified
 
