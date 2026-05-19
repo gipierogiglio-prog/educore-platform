@@ -1,5 +1,7 @@
 using System.Text;
 using Educore.Database;
+using Giglio.EduCore.DailyRoutines;
+using Giglio.EduCore.Disciplinary;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
