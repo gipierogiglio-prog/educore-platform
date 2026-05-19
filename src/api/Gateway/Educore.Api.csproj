@@ -11,6 +11,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.27" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="CsvHelper" Version="33.0.1" />
+    <PackageReference Include="EPPlus" Version="7.5.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,5 +27,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\modules\Financial\Educore.Financial.csproj" />
+    <ProjectReference Include="..\..\modules\DailyRoutines\Educore.DailyRoutines.csproj" />
   </ItemGroup>
 </Project>
